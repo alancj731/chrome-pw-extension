@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "ChromePW",
+  "version": "1.0.0",
+  "description": "A small, local-only encrypted password vault.",
+  "minimum_chrome_version": "102",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "ChromePW",
+    "default_popup": "popup.html"
+  }
+}

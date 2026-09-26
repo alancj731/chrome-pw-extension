@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ChromePW</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brand">
+        <div class="brand-mark" aria-hidden="true">C</div>
+        <div>
+          <h1>ChromePW</h1>
+          <p>Local encrypted password vault</p>
+        </div>
+      </header>
+
+      <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+
+      <section id="setup-view" hidden>
+        <div class="intro">
+          <h2>Create your vault</h2>
+          <p>Your master secret is never saved. You will enter it whenever you save or reveal a password.</p>
+        </div>
+        <form id="setup-form" class="stack">
+          <label>
+            Master secret
+            <input id="setup-secret" type="password" minlength="12" autocomplete="new-password" required>
+          </label>
+          <label>
+            Confirm master secret
+            <input id="setup-confirm" type="password" minlength="12" autocomplete="new-password" required>
+          </label>
+          <p class="hint">Use at least 12 characters. A forgotten secret cannot be recovered.</p>
+          <button class="primary" type="submit">Create vault</button>
+        </form>
+      </section>
+
+      <section id="vault-view" hidden>
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <h2>Get a password</h2>
+              <p id="credential-count">No saved credentials</p>
+            </div>
+          </div>
+
+          <div id="empty-state" class="empty" hidden>
+            Add your first credential below.
+          </div>
+
+          <form id="reveal-form" class="stack" hidden>
+            <label>
+              Website and username
+              <select id="credential-select" required></select>
+            </label>
+            <label>
+              Master secret
+              <input id="reveal-secret" type="password" minlength="12" autocomplete="current-password" required>
+            </label>
+            <button class="primary" type="submit">Decrypt password</button>
+          </form>
+
+          <div id="revealed-password" class="revealed" hidden>
+            <span class="eyebrow">Decrypted password</span>
+            <div class="password-row">
+              <input id="password-output" type="password" readonly aria-label="Decrypted password">
+              <button id="toggle-password" class="icon-button" type="button">Show</button>
+            </div>
+            <div class="button-row">
+              <button id="copy-password" class="secondary" type="button">Copy</button>
+              <button id="hide-password" class="ghost" type="button">Hide</button>
+            </div>
+          </div>
+
+          <div id="credential-actions" class="button-row compact" hidden>
+            <button id="edit-credential" class="ghost" type="button">Edit selected</button>
+            <button id="delete-credential" class="danger-text" type="button">Delete selected</button>
+          </div>
+        </section>
+
+        <details id="credential-editor" class="panel disclosure">
+          <summary id="editor-summary">Add a credential</summary>
+          <form id="credential-form" class="stack details-body">
+            <input id="credential-id" type="hidden">
+            <label>
+              Website name
+              <input id="website" type="text" maxlength="200" placeholder="e.g. AWS" autocomplete="off" required>
+            </label>
+            <label>
+              Username
+              <input id="username" type="text" maxlength="320" placeholder="e.g. you@example.com" autocomplete="off" required>
+            </label>
+            <label>
+              Password
+              <input id="entry-password" type="password" maxlength="10000" autocomplete="new-password">
+              <span id="password-help" class="hint">Required for a new credential.</span>
+            </label>
+            <label>
+              Master secret
+              <input id="save-secret" type="password" minlength="12" autocomplete="current-password" required>
+            </label>
+            <div class="button-row">
+              <button id="save-credential" class="primary" type="submit">Save credential</button>
+              <button id="cancel-edit" class="ghost" type="button" hidden>Cancel</button>
+            </div>
+          </form>
+        </details>
+
+        <details class="panel disclosure settings">
+          <summary>Vault settings</summary>
+          <div class="details-body">
+            <form id="change-secret-form" class="stack">
+              <h3>Change master secret</h3>
+              <label>
+                Current master secret
+                <input id="current-secret" type="password" minlength="12" autocomplete="current-password" required>
+              </label>
+              <label>
+                New master secret
+                <input id="new-secret" type="password" minlength="12" autocomplete="new-password" required>
+              </label>
+              <label>
+                Confirm new master secret
+                <input id="new-secret-confirm" type="password" minlength="12" autocomplete="new-password" required>
+              </label>
+              <button class="secondary" type="submit">Change secret</button>
+            </form>
+            <hr>
+            <h3>Reset vault</h3>
+            <p class="hint">Permanently deletes every saved credential.</p>
+            <button id="reset-vault" class="danger" type="button">Reset vault</button>
+          </div>
+        </details>
+      </section>
+
+      <footer>Passwords stay in <code>chrome.storage.local</code>.</footer>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
