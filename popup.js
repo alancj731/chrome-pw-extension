@@ -12,7 +12,8 @@ import {
 
 const STORAGE_KEYS = {
   config: "vaultConfig",
-  entries: "credentials"
+  legacyEntries: "credentials",
+  credentialPrefix: "credential:"
 };
 
 const elements = Object.fromEntries(
@@ -58,6 +59,7 @@ const elements = Object.fromEntries(
 let vaultConfig = null;
 let credentials = [];
 let messageTimer = null;
+let syncReloadTimer = null;
 
 function setBusy(form, busy) {
   for (const control of form.elements) {
@@ -78,19 +80,105 @@ function showMessage(text, type = "success", sticky = false) {
 }
 
 function reportError(error) {
-  const message =
+  let message =
     error instanceof VaultError || error instanceof Error
       ? error.message
       : "Something went wrong. Please try again.";
+  if (/quota|max_write_operations/i.test(message)) {
+    message = "Chrome Sync storage is full or temporarily rate-limited. Please try again later.";
+  }
   showMessage(message, "error", true);
 }
 
-async function loadState() {
-  const stored = await chrome.storage.local.get([STORAGE_KEYS.config, STORAGE_KEYS.entries]);
-  vaultConfig = stored[STORAGE_KEYS.config] ?? null;
-  credentials = Array.isArray(stored[STORAGE_KEYS.entries])
-    ? stored[STORAGE_KEYS.entries]
+function credentialStorageKey(id) {
+  return `${STORAGE_KEYS.credentialPrefix}${id}`;
+}
+
+function isCredentialRecord(value) {
+  return (
+    value &&
+    typeof value.id === "string" &&
+    typeof value.website === "string" &&
+    typeof value.username === "string" &&
+    value.password &&
+    typeof value.password.iv === "string" &&
+    typeof value.password.ciphertext === "string"
+  );
+}
+
+function assertSyncItemFits(key, value) {
+  const quota = chrome.storage.sync.QUOTA_BYTES_PER_ITEM ?? 8_192;
+  const bytes = new TextEncoder().encode(key + JSON.stringify(value)).byteLength;
+  if (bytes > quota) {
+    throw new VaultError(
+      "SYNC_ITEM_TOO_LARGE",
+      "This credential is too large for Chrome Sync. Use a shorter website name, username, or password."
+    );
+  }
+}
+
+function syncPayload(config, entries) {
+  const payload = { [STORAGE_KEYS.config]: config };
+  assertSyncItemFits(STORAGE_KEYS.config, config);
+  for (const credential of entries) {
+    const key = credentialStorageKey(credential.id);
+    assertSyncItemFits(key, credential);
+    payload[key] = credential;
+  }
+  return payload;
+}
+
+async function readSyncedVault() {
+  const stored = await chrome.storage.sync.get(null);
+  return {
+    config: stored[STORAGE_KEYS.config] ?? null,
+    entries: Object.entries(stored)
+      .filter(([key, value]) =>
+        key.startsWith(STORAGE_KEYS.credentialPrefix) && isCredentialRecord(value)
+      )
+      .map(([, value]) => value)
+  };
+}
+
+async function replaceSyncedVault(config, entries) {
+  const payload = syncPayload(config, entries);
+  const existing = await chrome.storage.sync.get(null);
+  const nextCredentialKeys = new Set(entries.map((entry) => credentialStorageKey(entry.id)));
+  const staleKeys = Object.keys(existing).filter(
+    (key) =>
+      key.startsWith(STORAGE_KEYS.credentialPrefix) && !nextCredentialKeys.has(key)
+  );
+
+  await chrome.storage.sync.set(payload);
+  if (staleKeys.length > 0) {
+    await chrome.storage.sync.remove(staleKeys);
+  }
+}
+
+async function migrateLegacyLocalVault() {
+  const legacy = await chrome.storage.local.get([
+    STORAGE_KEYS.config,
+    STORAGE_KEYS.legacyEntries
+  ]);
+  if (!legacy[STORAGE_KEYS.config]) return false;
+
+  const legacyEntries = Array.isArray(legacy[STORAGE_KEYS.legacyEntries])
+    ? legacy[STORAGE_KEYS.legacyEntries].filter(isCredentialRecord)
     : [];
+  await replaceSyncedVault(legacy[STORAGE_KEYS.config], legacyEntries);
+  await chrome.storage.local.remove([STORAGE_KEYS.config, STORAGE_KEYS.legacyEntries]);
+  return true;
+}
+
+async function loadState({ allowMigration = true } = {}) {
+  let synced = await readSyncedVault();
+  if (!synced.config && allowMigration && (await migrateLegacyLocalVault())) {
+    synced = await readSyncedVault();
+    showMessage("Your existing local vault was moved to Chrome Sync.");
+  }
+
+  vaultConfig = synced.config;
+  credentials = synced.entries;
   credentials.sort((left, right) =>
     `${left.website}\u0000${left.username}`.localeCompare(`${right.website}\u0000${right.username}`)
   );
@@ -146,13 +234,6 @@ function resetEditor() {
   elements["save-credential"].textContent = "Save credential";
 }
 
-async function saveState() {
-  await chrome.storage.local.set({
-    [STORAGE_KEYS.config]: vaultConfig,
-    [STORAGE_KEYS.entries]: credentials
-  });
-}
-
 elements["setup-form"].addEventListener("submit", async (event) => {
   event.preventDefault();
   const secret = elements["setup-secret"].value;
@@ -163,9 +244,10 @@ elements["setup-form"].addEventListener("submit", async (event) => {
 
   setBusy(elements["setup-form"], true);
   try {
-    vaultConfig = await createVaultConfig(secret, KDF_ITERATIONS);
+    const nextConfig = await createVaultConfig(secret, KDF_ITERATIONS);
+    await replaceSyncedVault(nextConfig, []);
+    vaultConfig = nextConfig;
     credentials = [];
-    await saveState();
     elements["setup-form"].reset();
     render();
     showMessage("Your encrypted vault is ready.");
@@ -259,10 +341,13 @@ elements["credential-form"].addEventListener("submit", async (event) => {
       updatedAt: now
     };
 
-    credentials = existing
+    const nextCredentials = existing
       ? credentials.map((item) => (item.id === id ? credential : item))
       : [...credentials, credential];
-    await saveState();
+    const storageKey = credentialStorageKey(id);
+    assertSyncItemFits(storageKey, credential);
+    await chrome.storage.sync.set({ [storageKey]: credential });
+    credentials = nextCredentials;
     resetEditor();
     elements["credential-editor"].open = false;
     render();
@@ -306,8 +391,8 @@ elements["delete-credential"].addEventListener("click", async () => {
 
   try {
     await unlockVault(secret, vaultConfig);
+    await chrome.storage.sync.remove(credentialStorageKey(credential.id));
     credentials = credentials.filter((item) => item.id !== credential.id);
-    await saveState();
     elements["reveal-secret"].value = "";
     hideRevealedPassword();
     resetEditor();
@@ -335,9 +420,9 @@ elements["change-secret-form"].addEventListener("submit", async (event) => {
       newSecret,
       vaultConfig
     );
+    await replaceSyncedVault(rotated.config, rotated.entries);
     vaultConfig = rotated.config;
     credentials = rotated.entries;
-    await saveState();
     elements["change-secret-form"].reset();
     hideRevealedPassword();
     showMessage("Master secret changed. All passwords were re-encrypted.");
@@ -353,7 +438,14 @@ elements["reset-vault"].addEventListener("click", async () => {
   if (confirmation !== "RESET") return;
 
   try {
-    await chrome.storage.local.remove([STORAGE_KEYS.config, STORAGE_KEYS.entries]);
+    const stored = await chrome.storage.sync.get(null);
+    const vaultKeys = Object.keys(stored).filter(
+      (key) => key === STORAGE_KEYS.config || key.startsWith(STORAGE_KEYS.credentialPrefix)
+    );
+    if (vaultKeys.length > 0) {
+      await chrome.storage.sync.remove(vaultKeys);
+    }
+    await chrome.storage.local.remove([STORAGE_KEYS.config, STORAGE_KEYS.legacyEntries]);
     vaultConfig = null;
     credentials = [];
     hideRevealedPassword();
@@ -370,6 +462,18 @@ window.addEventListener("pagehide", () => {
   for (const input of document.querySelectorAll('input[type="password"]')) {
     input.value = "";
   }
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  const relevantChange = Object.keys(changes).some(
+    (key) => key === STORAGE_KEYS.config || key.startsWith(STORAGE_KEYS.credentialPrefix)
+  );
+  if (areaName !== "sync" || !relevantChange) return;
+
+  clearTimeout(syncReloadTimer);
+  syncReloadTimer = setTimeout(() => {
+    loadState({ allowMigration: false }).catch(reportError);
+  }, 150);
 });
 
 loadState().catch(reportError);
