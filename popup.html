@@ -18,20 +18,35 @@
 
       <div id="message" class="message" role="status" aria-live="polite" hidden></div>
 
-      <section id="backup-warning" class="backup-warning" hidden>
-        <div>
-          <strong>Local safety backup available</strong>
-          <p id="backup-warning-text"></p>
+      <dialog id="create-vault-warning" class="warning-dialog" aria-labelledby="create-vault-warning-title">
+        <div class="warning-dialog-content">
+          <div class="warning-heading">
+            <span class="warning-icon" aria-hidden="true">!</span>
+            <div>
+              <h2 id="create-vault-warning-title">Replace the synced vault?</h2>
+              <p>Creating a new vault permanently removes every saved password in the current ChromePW vault from all computers using this Chrome Sync account.</p>
+            </div>
+          </div>
+          <p class="warning-note"><strong>This action cannot be undone.</strong> Make sure Chrome Sync has finished before continuing.</p>
+          <div class="warning-actions">
+            <button id="dismiss-create-warning" class="ghost" type="button">Keep existing vault</button>
+            <button id="confirm-create-warning" class="danger" type="button">Replace synced vault</button>
+          </div>
         </div>
-        <button id="restore-backup" class="secondary" type="button">Restore missing credentials</button>
-      </section>
+      </dialog>
 
       <section id="setup-view" hidden>
         <div class="intro">
-          <h2>Create your vault</h2>
-          <p>Your master secret is never saved. You will enter it whenever you save or reveal a password.</p>
+          <h2>No synced vault found yet</h2>
+          <p>If you already use ChromePW on another computer, do not create another vault. Check Chrome Sync again after it has had time to download your existing vault.</p>
         </div>
-        <form id="setup-form" class="stack">
+        <div id="setup-actions" class="stack">
+          <button id="refresh-sync" class="secondary" type="button">Check Chrome Sync again</button>
+          <button id="begin-create-vault" class="danger" type="button">Create a new vault</button>
+        </div>
+        <form id="setup-form" class="stack panel" hidden>
+          <h2>Create a new vault</h2>
+          <p class="form-intro">Choose the master secret that will protect your new vault.</p>
           <label>
             Master secret
             <input id="setup-secret" type="password" minlength="12" autocomplete="new-password" required>
@@ -41,11 +56,17 @@
             <input id="setup-confirm" type="password" minlength="12" autocomplete="new-password" required>
           </label>
           <p class="hint">Use at least 12 characters. A forgotten secret cannot be recovered.</p>
-          <button class="primary" type="submit">Create vault</button>
+          <div class="button-row">
+            <button class="danger" type="submit">Create new vault</button>
+            <button id="cancel-create-vault" class="ghost" type="button">Cancel</button>
+          </div>
         </form>
       </section>
 
       <section id="vault-view" hidden>
+        <div id="multi-vault-notice" class="vault-notice" hidden>
+          Multiple vault records were found. ChromePW is using the oldest established vault so a new computer cannot replace it.
+        </div>
         <section class="panel">
           <div class="section-heading">
             <div>
