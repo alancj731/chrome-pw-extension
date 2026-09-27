@@ -25,6 +25,41 @@ ChromePW is a small Chrome extension for manually storing encrypted passwords an
 
 Click the ChromePW toolbar icon to create or use the vault.
 
+## How to use ChromePW
+
+### 1. Let ChromePW check Sync first
+
+When ChromePW opens on a new computer, it checks Chrome Sync for an existing vault. If no vault appears yet, wait for Chrome Sync to finish and select **Check Chrome Sync again**.
+
+Do not create a new vault if you already use ChromePW on another computer.
+
+![ChromePW waiting for a synchronized vault](screenshots/no-synced-vault.png)
+
+### 2. Create a vault only when you need a new one
+
+If you are certain that no existing vault should be used, select **Create a new vault**. ChromePW shows a confirmation before replacing synchronized data.
+
+Creating a new vault removes the previous ChromePW passwords from every computer using the same Chrome Sync account. Choose **Keep existing vault** unless you intend to replace it.
+
+![ChromePW warning before replacing the synchronized vault](screenshots/replace-vault-warning.png)
+
+After confirming, enter and confirm a master secret of at least 12 characters. The master secret is never saved and cannot be recovered.
+
+### 3. Save and retrieve credentials
+
+Open **Add a credential** to save a website name, username, and password. Enter the master secret to encrypt and save the password.
+
+To retrieve a password:
+
+1. Select the website and username.
+2. Enter the master secret.
+3. Select **Decrypt password**.
+4. Copy the password or hide it when finished.
+
+![ChromePW credential selection and password decryption screen](screenshots/password-vault.png)
+
+Use **Edit selected** or **Delete selected** to manage a credential. Open **Vault settings** to change the master secret or reset the vault.
+
 ## Security design
 
 - The master secret is never stored.
