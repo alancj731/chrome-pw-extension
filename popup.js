@@ -9,16 +9,25 @@ import {
   unlockVault,
   validateLabel
 } from "./vault.js";
+import {
+  mergeSafetyBackup,
+  missingBackupEntries,
+  sameVaultConfig
+} from "./sync-model.js";
 
 const STORAGE_KEYS = {
   config: "vaultConfig",
   legacyEntries: "credentials",
-  credentialPrefix: "credential:"
+  credentialPrefix: "credential:",
+  safetyBackup: "safetyBackupV1"
 };
 
 const elements = Object.fromEntries(
   [
     "message",
+    "backup-warning",
+    "backup-warning-text",
+    "restore-backup",
     "setup-view",
     "setup-form",
     "setup-secret",
@@ -58,6 +67,7 @@ const elements = Object.fromEntries(
 
 let vaultConfig = null;
 let credentials = [];
+let safetyBackup = null;
 let messageTimer = null;
 let syncReloadTimer = null;
 
@@ -142,16 +152,26 @@ async function readSyncedVault() {
 
 async function replaceSyncedVault(config, entries) {
   const payload = syncPayload(config, entries);
-  const existing = await chrome.storage.sync.get(null);
-  const nextCredentialKeys = new Set(entries.map((entry) => credentialStorageKey(entry.id)));
-  const staleKeys = Object.keys(existing).filter(
-    (key) =>
-      key.startsWith(STORAGE_KEYS.credentialPrefix) && !nextCredentialKeys.has(key)
-  );
-
   await chrome.storage.sync.set(payload);
-  if (staleKeys.length > 0) {
-    await chrome.storage.sync.remove(staleKeys);
+}
+
+async function readSafetyBackup() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.safetyBackup);
+  const backup = stored[STORAGE_KEYS.safetyBackup];
+  return backup?.config && Array.isArray(backup?.entries) ? backup : null;
+}
+
+async function updateSafetyBackup(
+  config,
+  entries,
+  { deletedIds = [], forceReplace = false } = {}
+) {
+  safetyBackup = mergeSafetyBackup(safetyBackup, config, entries, {
+    deletedIds,
+    forceReplace
+  });
+  if (safetyBackup) {
+    await chrome.storage.local.set({ [STORAGE_KEYS.safetyBackup]: safetyBackup });
   }
 }
 
@@ -165,12 +185,16 @@ async function migrateLegacyLocalVault() {
   const legacyEntries = Array.isArray(legacy[STORAGE_KEYS.legacyEntries])
     ? legacy[STORAGE_KEYS.legacyEntries].filter(isCredentialRecord)
     : [];
+  await updateSafetyBackup(legacy[STORAGE_KEYS.config], legacyEntries, {
+    forceReplace: true
+  });
   await replaceSyncedVault(legacy[STORAGE_KEYS.config], legacyEntries);
   await chrome.storage.local.remove([STORAGE_KEYS.config, STORAGE_KEYS.legacyEntries]);
   return true;
 }
 
 async function loadState({ allowMigration = true } = {}) {
+  safetyBackup = await readSafetyBackup();
   let synced = await readSyncedVault();
   if (!synced.config && allowMigration && (await migrateLegacyLocalVault())) {
     synced = await readSyncedVault();
@@ -179,13 +203,30 @@ async function loadState({ allowMigration = true } = {}) {
 
   vaultConfig = synced.config;
   credentials = synced.entries;
+  await updateSafetyBackup(vaultConfig, credentials);
   credentials.sort((left, right) =>
     `${left.website}\u0000${left.username}`.localeCompare(`${right.website}\u0000${right.username}`)
   );
   render();
 }
 
+function recoveryEntries() {
+  if (!vaultConfig && safetyBackup?.config) {
+    return safetyBackup.entries;
+  }
+  return missingBackupEntries(safetyBackup, vaultConfig, credentials);
+}
+
 function render() {
+  const missingEntries = recoveryEntries();
+  elements["backup-warning"].hidden = missingEntries.length === 0;
+  if (missingEntries.length > 0) {
+    const countLabel =
+      missingEntries.length === 1 ? "1 credential is" : `${missingEntries.length} credentials are`;
+    elements["backup-warning-text"].textContent =
+      `${countLabel} missing from Chrome Sync but still available in this device's encrypted backup.`;
+  }
+
   const configured = Boolean(vaultConfig);
   elements["setup-view"].hidden = configured;
   elements["vault-view"].hidden = !configured;
@@ -236,6 +277,10 @@ function resetEditor() {
 
 elements["setup-form"].addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (recoveryEntries().length > 0) {
+    reportError(new Error("A local vault backup exists. Restore it before creating a new vault."));
+    return;
+  }
   const secret = elements["setup-secret"].value;
   if (secret !== elements["setup-confirm"].value) {
     reportError(new Error("The master secrets do not match."));
@@ -248,6 +293,7 @@ elements["setup-form"].addEventListener("submit", async (event) => {
     await replaceSyncedVault(nextConfig, []);
     vaultConfig = nextConfig;
     credentials = [];
+    await updateSafetyBackup(vaultConfig, credentials, { forceReplace: true });
     elements["setup-form"].reset();
     render();
     showMessage("Your encrypted vault is ready.");
@@ -348,6 +394,7 @@ elements["credential-form"].addEventListener("submit", async (event) => {
     assertSyncItemFits(storageKey, credential);
     await chrome.storage.sync.set({ [storageKey]: credential });
     credentials = nextCredentials;
+    await updateSafetyBackup(vaultConfig, credentials);
     resetEditor();
     elements["credential-editor"].open = false;
     render();
@@ -393,6 +440,9 @@ elements["delete-credential"].addEventListener("click", async () => {
     await unlockVault(secret, vaultConfig);
     await chrome.storage.sync.remove(credentialStorageKey(credential.id));
     credentials = credentials.filter((item) => item.id !== credential.id);
+    await updateSafetyBackup(vaultConfig, credentials, {
+      deletedIds: [credential.id]
+    });
     elements["reveal-secret"].value = "";
     hideRevealedPassword();
     resetEditor();
@@ -405,6 +455,12 @@ elements["delete-credential"].addEventListener("click", async () => {
 
 elements["change-secret-form"].addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (recoveryEntries().length > 0) {
+    reportError(
+      new Error("Restore the missing credentials from the local backup before changing the master secret.")
+    );
+    return;
+  }
   const currentSecret = elements["current-secret"].value;
   const newSecret = elements["new-secret"].value;
   if (newSecret !== elements["new-secret-confirm"].value) {
@@ -423,6 +479,7 @@ elements["change-secret-form"].addEventListener("submit", async (event) => {
     await replaceSyncedVault(rotated.config, rotated.entries);
     vaultConfig = rotated.config;
     credentials = rotated.entries;
+    await updateSafetyBackup(vaultConfig, credentials, { forceReplace: true });
     elements["change-secret-form"].reset();
     hideRevealedPassword();
     showMessage("Master secret changed. All passwords were re-encrypted.");
@@ -445,15 +502,49 @@ elements["reset-vault"].addEventListener("click", async () => {
     if (vaultKeys.length > 0) {
       await chrome.storage.sync.remove(vaultKeys);
     }
-    await chrome.storage.local.remove([STORAGE_KEYS.config, STORAGE_KEYS.legacyEntries]);
+    await chrome.storage.local.remove([
+      STORAGE_KEYS.config,
+      STORAGE_KEYS.legacyEntries,
+      STORAGE_KEYS.safetyBackup
+    ]);
     vaultConfig = null;
     credentials = [];
+    safetyBackup = null;
     hideRevealedPassword();
     resetEditor();
     render();
     showMessage("Vault reset. You can create a new one.");
   } catch (error) {
     reportError(error);
+  }
+});
+
+elements["restore-backup"].addEventListener("click", async () => {
+  const missingEntries = recoveryEntries();
+  if (missingEntries.length === 0 || !safetyBackup?.config) return;
+  if (!confirm(`Restore ${missingEntries.length} credential(s) from this device's backup?`)) {
+    return;
+  }
+
+  elements["restore-backup"].disabled = true;
+  try {
+    const restoreConfig = vaultConfig ?? safetyBackup.config;
+    if (vaultConfig && !sameVaultConfig(vaultConfig, safetyBackup.config)) {
+      throw new Error("The local backup belongs to a different vault and cannot be merged safely.");
+    }
+    const currentById = new Map(credentials.map((entry) => [entry.id, entry]));
+    for (const entry of missingEntries) currentById.set(entry.id, entry);
+    const restoredEntries = [...currentById.values()];
+    await replaceSyncedVault(restoreConfig, restoredEntries);
+    vaultConfig = restoreConfig;
+    credentials = restoredEntries;
+    await updateSafetyBackup(vaultConfig, credentials, { forceReplace: true });
+    render();
+    showMessage("Missing credentials were restored to Chrome Sync.");
+  } catch (error) {
+    reportError(error);
+  } finally {
+    elements["restore-backup"].disabled = false;
   }
 });
 

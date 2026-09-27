@@ -30,6 +30,8 @@ Click the ChromePW toolbar icon to create or use the vault.
 - Each password has a new random 12-byte IV and authenticated encryption.
 - Passwords are stored in `chrome.storage.sync`; website labels and usernames remain plaintext so they can be selected before entering the master secret.
 - Each credential is stored as a separate sync item to respect Chrome's per-item storage quota.
+- Each device keeps an encrypted local safety backup and offers to restore credentials that disappear from Sync.
+- A partially synchronized device never deletes credentials merely because they are absent from its current snapshot.
 - The extension requests only Chrome's `storage` permission and has no content scripts, host permissions, background worker, analytics, or network code.
 - Closing the popup discards entered secrets and decrypted values from the extension page.
 

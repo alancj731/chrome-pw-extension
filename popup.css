@@ -204,6 +204,23 @@ button {
   background: #f8dddd;
 }
 
+.backup-warning {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  border: 1px solid #d9bd72;
+  border-radius: 12px;
+  padding: 12px;
+  color: #5d4613;
+  background: #fff7dd;
+  font-size: 12px;
+}
+
+.backup-warning p {
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
 .hint {
   margin: 0;
   color: #708078;

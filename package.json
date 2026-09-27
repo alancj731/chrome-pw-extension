@@ -1,10 +1,10 @@
 {
   "name": "chromepw",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "check": "node --check vault.js && node --check popup.js"
+    "check": "node --check vault.js && node --check sync-model.js && node --check popup.js"
   }
 }

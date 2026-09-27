@@ -12,11 +12,19 @@
         <div class="brand-mark" aria-hidden="true">C</div>
         <div>
           <h1>ChromePW</h1>
-          <p>Local encrypted password vault</p>
+          <p>Encrypted vault with Chrome Sync</p>
         </div>
       </header>
 
       <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+
+      <section id="backup-warning" class="backup-warning" hidden>
+        <div>
+          <strong>Local safety backup available</strong>
+          <p id="backup-warning-text"></p>
+        </div>
+        <button id="restore-backup" class="secondary" type="button">Restore missing credentials</button>
+      </section>
 
       <section id="setup-view" hidden>
         <div class="intro">
