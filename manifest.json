@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwfldRZPxJzsLvP2EBlwxyMk3E52dzu+sSMp0CJvRAhDhxiwx6/a4jUFUKUZPWhXyaihcsjAjoX+Q9AccjYCeXKxWe80RA1L4cAL8bRHXtoUBCjizOOJ7wgXQ3hnzMLJEpuCwJIBnpESrUwEU8lB+7kcWQKJ2GHdZHq2a6uEbQYkiDEll/DlH8hu3KFEVfcJe6bfJddpvAPFoqUVA6nGvno4Rc7N5yfExPk1hjUKDotMuxWQly2bBi4+AaiTxCmiYm7pYoWFQAZYihppOoSJI7XsG6lgP4G1rEJjSHZR8nAGqJf7G5UnBq0GYpmas3NFa73VQQOlZ55nQaod06r/PxwIDAQAB",
   "name": "ChromePW",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "A small encrypted password vault synced through Chrome.",
   "minimum_chrome_version": "102",
   "permissions": ["storage"],

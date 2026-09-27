@@ -9,7 +9,7 @@ import {
   unlockVault,
   validateLabel
 } from "./vault.js";
-import { selectCanonicalVault, withVaultIdentity } from "./sync-model.js";
+import { resolveVaultSnapshot, withVaultIdentity } from "./sync-model.js";
 
 const STORAGE_KEYS = {
   legacyConfig: "vaultConfig",
@@ -155,62 +155,16 @@ async function readSyncedVault() {
   const legacyConfig = stored[STORAGE_KEYS.legacyConfig]
     ? withVaultIdentity(stored[STORAGE_KEYS.legacyConfig])
     : null;
-  if (legacyConfig && !configs.some((config) => config.vaultId === legacyConfig.vaultId)) {
-    configs.push(legacyConfig);
-  }
-
   const selectedVaultId =
     typeof stored[STORAGE_KEYS.activeVault]?.vaultId === "string"
       ? stored[STORAGE_KEYS.activeVault].vaultId
       : null;
-  const selectedConfig = selectedVaultId
-    ? configs.find((candidate) => candidate.vaultId === selectedVaultId) ?? null
-    : null;
-  const config = selectedConfig ?? selectCanonicalVault(configs);
-  const canAdoptLegacyEntries = Boolean(
-    !selectedConfig && legacyConfig && config?.vaultId === legacyConfig.vaultId
-  );
   const allEntries = Object.entries(stored)
     .filter(([key, value]) =>
       key.startsWith(STORAGE_KEYS.credentialPrefix) && isCredentialRecord(value)
     )
     .map(([, value]) => value);
-  const entries = config
-    ? allEntries
-        .filter(
-          (entry) =>
-            entry.vaultId === config.vaultId ||
-            (!entry.vaultId && canAdoptLegacyEntries)
-        )
-        .map((entry) => ({ ...entry, vaultId: config.vaultId }))
-    : [];
-  const obsoleteKeys = selectedConfig
-    ? Object.entries(stored)
-        .filter(([key, value]) => {
-          if (key === STORAGE_KEYS.legacyConfig) return true;
-          if (key.startsWith(STORAGE_KEYS.configPrefix)) {
-            return key !== `${STORAGE_KEYS.configPrefix}${selectedConfig.vaultId}`;
-          }
-          return (
-            key.startsWith(STORAGE_KEYS.credentialPrefix) &&
-            isCredentialRecord(value) &&
-            value.vaultId !== selectedConfig.vaultId
-          );
-        })
-        .map(([key]) => key)
-    : [];
-
-  return {
-    config,
-    entries,
-    vaultCount: configs.length,
-    obsoleteKeys,
-    needsLegacyArchive: Boolean(
-      canAdoptLegacyEntries &&
-      (!stored[`${STORAGE_KEYS.configPrefix}${legacyConfig.vaultId}`] ||
-        allEntries.some((entry) => !entry.vaultId))
-    )
-  };
+  return resolveVaultSnapshot(configs, legacyConfig, selectedVaultId, allEntries);
 }
 
 async function replaceSyncedVault(config, entries) {
@@ -247,16 +201,9 @@ async function replaceActiveSyncedVault(config, entries = []) {
 
 async function loadState() {
   await chrome.storage.local.remove(OBSOLETE_LOCAL_KEYS);
-  let synced = await readSyncedVault();
-  if (synced.obsoleteKeys.length > 0) {
-    await chrome.storage.sync.remove(synced.obsoleteKeys);
-    synced = await readSyncedVault();
-  }
-  if (synced.config && synced.needsLegacyArchive) {
-    await replaceSyncedVault(synced.config, synced.entries);
-    await chrome.storage.sync.remove(STORAGE_KEYS.legacyConfig);
-    synced = await readSyncedVault();
-  }
+  // Keep startup and Sync event handling read-only. A partial snapshot must
+  // never cause records to be removed from every synchronized computer.
+  const synced = await readSyncedVault();
 
   vaultConfig = synced.config;
   credentials = synced.entries;

@@ -71,6 +71,7 @@ Use **Edit selected** or **Delete selected** to manage a credential. Open **Vaul
 - If several vault records arrive out of order, ChromePW consistently selects the oldest established vault.
 - An explicitly created replacement is marked as the active vault and removes the previous synchronized vault from other computers.
 - A partially synchronized device never deletes credentials merely because they are absent from its current snapshot.
+- Opening ChromePW and processing Sync updates are read-only; synchronized records are deleted only by an explicit user action.
 - ChromePW does not keep a second vault in `chrome.storage.local`; earlier local-backup keys are deleted without being read or uploaded, so stale local data cannot affect other computers.
 - The extension requests only Chrome's `storage` permission and has no content scripts, host permissions, background worker, analytics, or network code.
 - Closing the popup discards entered secrets and decrypted values from the extension page.

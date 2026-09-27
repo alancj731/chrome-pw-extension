@@ -21,3 +21,41 @@ export function selectCanonicalVault(configs) {
     return dateOrder || String(left.vaultId).localeCompare(String(right.vaultId));
   })[0];
 }
+
+export function resolveVaultSnapshot(
+  configs,
+  legacyConfig,
+  selectedVaultId,
+  allEntries
+) {
+  const candidates = [...configs];
+  if (
+    legacyConfig &&
+    !candidates.some((config) => config.vaultId === legacyConfig.vaultId)
+  ) {
+    candidates.push(legacyConfig);
+  }
+
+  const selectedConfig = selectedVaultId
+    ? candidates.find((config) => config.vaultId === selectedVaultId) ?? null
+    : null;
+  const config = selectedConfig ?? selectCanonicalVault(candidates);
+  const canAdoptLegacyEntries = Boolean(
+    !selectedConfig && legacyConfig && config?.vaultId === legacyConfig.vaultId
+  );
+  const entries = config
+    ? allEntries
+        .filter(
+          (entry) =>
+            entry.vaultId === config.vaultId ||
+            (!entry.vaultId && canAdoptLegacyEntries)
+        )
+        .map((entry) => ({ ...entry, vaultId: config.vaultId }))
+    : [];
+
+  return {
+    config,
+    entries,
+    vaultCount: candidates.length
+  };
+}
