@@ -23,14 +23,14 @@
           <div class="warning-heading">
             <span class="warning-icon" aria-hidden="true">!</span>
             <div>
-              <h2 id="create-vault-warning-title">Replace the synced vault?</h2>
-              <p>Creating a new vault permanently removes every saved password in the current ChromePW vault from all computers using this Chrome Sync account.</p>
+              <h2 id="create-vault-warning-title">Create a separate vault?</h2>
+              <p>If you already use ChromePW on another computer, its vault may still be downloading. A new vault will not contain those passwords and will use a different master secret.</p>
             </div>
           </div>
-          <p class="warning-note"><strong>This action cannot be undone.</strong> Make sure Chrome Sync has finished before continuing.</p>
+          <p class="warning-note">Existing vaults are never deleted. When an older vault arrives from Chrome Sync, ChromePW uses it and keeps this one available under <strong>Switch vault</strong>.</p>
           <div class="warning-actions">
             <button id="dismiss-create-warning" class="ghost" type="button">Keep existing vault</button>
-            <button id="confirm-create-warning" class="danger" type="button">Replace synced vault</button>
+            <button id="confirm-create-warning" class="danger" type="button">Create new vault</button>
           </div>
         </div>
       </dialog>
@@ -65,7 +65,18 @@
 
       <section id="vault-view" hidden>
         <div id="multi-vault-notice" class="vault-notice" hidden>
-          Multiple vault records were found. ChromePW is using the oldest established vault so a new computer cannot replace it.
+          <p>Several vaults were found in Chrome Sync. ChromePW uses the oldest one unless you pick another.</p>
+          <form id="vault-switch-form" class="stack">
+            <label>
+              Switch vault
+              <select id="vault-switch-select" required></select>
+            </label>
+            <label>
+              Master secret for that vault
+              <input id="vault-switch-secret" type="password" minlength="12" autocomplete="current-password" required>
+            </label>
+            <button class="secondary" type="submit">Use this vault</button>
+          </form>
         </div>
         <section class="panel">
           <div class="section-heading">
@@ -156,9 +167,19 @@
               </label>
               <button class="secondary" type="submit">Change secret</button>
             </form>
+            <div id="prune-vaults-section" hidden>
+              <hr>
+              <h3>Delete other vaults</h3>
+              <p class="hint">Permanently deletes every vault except the one in use, on all computers.</p>
+              <label>
+                Master secret
+                <input id="prune-secret" type="password" minlength="12" autocomplete="current-password">
+              </label>
+              <button id="prune-vaults" class="danger" type="button">Delete other vaults</button>
+            </div>
             <hr>
             <h3>Reset vault</h3>
-            <p class="hint">Permanently deletes every saved credential.</p>
+            <p class="hint">Permanently deletes every vault and saved credential.</p>
             <button id="reset-vault" class="danger" type="button">Reset vault</button>
           </div>
         </details>

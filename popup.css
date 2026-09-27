@@ -293,6 +293,15 @@ button {
   line-height: 1.4;
 }
 
+.vault-notice p {
+  margin: 0 0 10px;
+}
+
+#prune-vaults-section {
+  display: grid;
+  gap: 10px;
+}
+
 .hint {
   margin: 0;
   color: #708078;

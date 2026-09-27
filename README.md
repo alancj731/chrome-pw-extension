@@ -12,7 +12,8 @@ ChromePW is a small Chrome extension for manually storing encrypted passwords an
 - Change the master secret and re-encrypt every saved password.
 - Synchronize the encrypted vault between Chrome browsers signed into the same Google account.
 - Keep master-secret fields hidden on startup unless creating a brand-new vault or performing a protected operation.
-- Check Chrome Sync before offering vault creation; creating a replacement requires an explicit destructive warning and master secret.
+- Check Chrome Sync before offering vault creation; creating a vault never removes or hides an existing one.
+- Switch between vaults (with that vault's master secret) if several exist in Chrome Sync.
 - Reset the vault if the master secret is lost.
 
 ## Install in Chrome
@@ -37,9 +38,9 @@ Do not create a new vault if you already use ChromePW on another computer.
 
 ### 2. Create a vault only when you need a new one
 
-If you are certain that no existing vault should be used, select **Create a new vault**. ChromePW shows a confirmation before replacing synchronized data.
+If you are certain that no existing vault should be used, select **Create a new vault**. ChromePW asks for confirmation first.
 
-Creating a new vault removes the previous ChromePW passwords from every computer using the same Chrome Sync account. Choose **Keep existing vault** unless you intend to replace it.
+Creating a vault is additive: it never deletes or hides another vault. If an older vault arrives from Chrome Sync afterwards, ChromePW uses the older vault and lists both under **Switch vault**. Unwanted vaults can be removed explicitly with **Vault settings → Delete other vaults**.
 
 ![ChromePW warning before replacing the synchronized vault](screenshots/replace-vault-warning.png)
 
@@ -69,10 +70,10 @@ Use **Edit selected** or **Delete selected** to manage a credential. Open **Vaul
 - Each credential is stored as a separate sync item to respect Chrome's per-item storage quota.
 - Vault configurations use immutable unique IDs, so first-run setup on a partially synced computer cannot overwrite an established vault.
 - If several vault records arrive out of order, ChromePW consistently selects the oldest established vault.
-- An explicitly created replacement is marked as the active vault and removes the previous synchronized vault from other computers.
+- Creating a vault never marks it active or removes other vaults; only an explicit **Use this vault** (verified with that vault's master secret) changes which vault every computer shows.
 - A partially synchronized device never deletes credentials merely because they are absent from its current snapshot.
 - Opening ChromePW and processing Sync updates are read-only; synchronized records are deleted only by an explicit user action.
-- ChromePW does not keep a second vault in `chrome.storage.local`; earlier local-backup keys are deleted without being read or uploaded, so stale local data cannot affect other computers.
+- ChromePW does not keep a second vault in `chrome.storage.local`; a vault left there by an earlier version is copied into Chrome Sync as an additional vault (never overwriting synced records), and the local copy is removed only after the copy is confirmed.
 - The extension requests only Chrome's `storage` permission and has no content scripts, host permissions, background worker, analytics, or network code.
 - Closing the popup discards entered secrets and decrypted values from the extension page.
 
