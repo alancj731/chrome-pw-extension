@@ -14,6 +14,8 @@ ChromePW is a small Chrome extension for manually storing encrypted passwords an
 - Keep master-secret fields hidden on startup unless creating a brand-new vault or performing a protected operation.
 - Check Chrome Sync before offering vault creation; creating a vault never removes or hides an existing one.
 - Switch between vaults (with that vault's master secret) if several exist in Chrome Sync.
+- Keep an encrypted copy of the vault on each computer and restore it if Chrome Sync loses it.
+- Export and import an encrypted backup file.
 - Reset the vault if the master secret is lost.
 
 ## Install in Chrome
@@ -61,6 +63,14 @@ To retrieve a password:
 
 Use **Edit selected** or **Delete selected** to manage a credential. Open **Vault settings** to change the master secret or reset the vault.
 
+### 4. Removing, updating and backing up
+
+**Do not remove ChromePW to update it.** Removing an extension makes Chrome delete its Chrome Sync data, and that deletion reaches every computer on the same Google account. To update, select **reload ↻** on the ChromePW card in `chrome://extensions`.
+
+If ChromePW is removed on one computer anyway, the other computers still have their own encrypted copy. Opening ChromePW there shows **Your vault can be restored**; select **Restore to Chrome Sync** to put the vault back for every computer. Restoring only adds what is missing and never overwrites anything. Deliberately deleted credentials and vaults (**Delete selected**, **Delete other vaults**, **Reset vault**) are not offered for restore.
+
+Open **Vault settings → Export backup** from time to time and keep the file somewhere safe. It protects you if ChromePW is removed on your only computer. Use **Import backup** (or **Import a backup file** on the setup screen) to restore it. The passwords in the file stay encrypted and still need the master secret.
+
 ## Security design
 
 - The master secret is never stored.
@@ -73,7 +83,10 @@ Use **Edit selected** or **Delete selected** to manage a credential. Open **Vaul
 - Creating a vault never marks it active or removes other vaults; only an explicit **Use this vault** (verified with that vault's master secret) changes which vault every computer shows.
 - A partially synchronized device never deletes credentials merely because they are absent from its current snapshot.
 - Opening ChromePW and processing Sync updates are read-only; synchronized records are deleted only by an explicit user action.
-- ChromePW does not keep a second vault in `chrome.storage.local`; a vault left there by an earlier version is copied into Chrome Sync as an additional vault (never overwriting synced records), and the local copy is removed only after the copy is confirmed.
+- Each computer keeps an encrypted mirror of the synchronized vaults in `chrome.storage.local`. Removing the extension on another computer cannot delete it. The mirror is written only locally, and it goes back to Chrome Sync only when you select **Restore to Chrome Sync**.
+- Intentional deletions are recorded as tombstones in Chrome Sync, so mirrors on other computers never offer to restore them.
+- A vault left in `chrome.storage.local` by an earlier version is copied into Chrome Sync as an additional vault (never overwriting synced records), and the old local copy is removed only after the copy is confirmed.
+- Backup files contain only the already-encrypted vault data; they do not contain the master secret.
 - The extension requests only Chrome's `storage` permission and has no content scripts, host permissions, background worker, analytics, or network code.
 - Closing the popup discards entered secrets and decrypted values from the extension page.
 

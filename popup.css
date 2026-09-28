@@ -301,6 +301,37 @@ button {
   margin: 0 0 10px;
 }
 
+.restore-notice {
+  color: #6b4a12;
+  background: #fbf1dc;
+}
+
+.restore-notice button {
+  width: 100%;
+}
+
+.restore-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  border: 1px solid #ecd9ad;
+  border-radius: 12px;
+  padding: 14px;
+  color: #5c4312;
+  background: #fdf6e6;
+}
+
+.restore-panel h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.restore-panel p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 #prune-vaults-section {
   display: grid;
   gap: 10px;

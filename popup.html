@@ -78,8 +78,14 @@
           <h2>No synced vault found yet</h2>
           <p>If you already use ChromePW on another computer, do not create another vault. Check Chrome Sync again after it has had time to download your existing vault.</p>
         </div>
+        <div id="restore-panel" class="restore-panel" hidden>
+          <h2>Your vault can be restored</h2>
+          <p id="restore-summary"></p>
+          <button id="restore-vaults" class="primary" type="button">Restore to Chrome Sync</button>
+        </div>
         <div id="setup-actions" class="stack">
           <button id="refresh-sync" class="secondary" type="button">Check Chrome Sync again</button>
+          <button id="import-backup-setup" class="ghost" type="button">Import a backup file</button>
           <button id="begin-create-vault" class="danger" type="button">Create a new vault</button>
         </div>
         <form id="setup-form" class="stack panel" hidden>
@@ -102,6 +108,10 @@
       </section>
 
       <section id="vault-view" hidden>
+        <div id="restore-notice" class="vault-notice restore-notice" hidden>
+          <p id="restore-notice-text"></p>
+          <button id="restore-vaults-inline" class="secondary" type="button">Restore to Chrome Sync</button>
+        </div>
         <div id="multi-vault-notice" class="vault-notice" hidden>
           <p>Several vaults were found in Chrome Sync. ChromePW uses the oldest one unless you pick another.</p>
           <form id="vault-switch-form" class="stack">
@@ -211,6 +221,13 @@
               </label>
               <button class="secondary" type="submit">Change secret</button>
             </form>
+            <hr>
+            <h3>Backup</h3>
+            <p class="hint">Removing ChromePW from a computer deletes its Chrome Sync data on every computer. Keep a backup file somewhere safe. Passwords in it stay encrypted.</p>
+            <div class="button-row">
+              <button id="export-backup" class="secondary" type="button">Export backup</button>
+              <button id="import-backup" class="ghost" type="button">Import backup</button>
+            </div>
             <div id="prune-vaults-section" hidden>
               <hr>
               <h3>Delete other vaults</h3>
@@ -231,6 +248,7 @@
 
       <footer>Encrypted passwords sync through your Chrome account.</footer>
     </main>
+    <input id="import-file" type="file" accept=".json,application/json" hidden>
     <script type="module" src="popup.js"></script>
   </body>
 </html>

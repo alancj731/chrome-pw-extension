@@ -10,7 +10,14 @@ import {
   validateLabel
 } from "./vault.js";
 import {
+  addTombstones,
+  buildBackup,
+  isCredentialRecord,
   legacyVaultId,
+  mergeMirror,
+  missingFromSync,
+  parseBackup,
+  removeTombstones,
   resolveVaultSnapshot,
   withVaultIdentity
 } from "./sync-model.js";
@@ -23,8 +30,15 @@ const STORAGE_KEYS = {
   // also written implicitly when a new computer created a vault, which hid the
   // established vault everywhere, so it is ignored.
   activeVault: "activeVaultV2",
-  obsoleteActiveVault: "activeVaultV1"
+  obsoleteActiveVault: "activeVaultV1",
+  // Records vaults and credentials deleted on purpose, so local mirrors on
+  // other computers do not offer to restore them.
+  tombstones: "vaultTombstonesV1"
 };
+
+// Per-computer copy of the encrypted vaults. Removing the extension on another
+// computer deletes its Chrome Sync data everywhere, but not this copy.
+const MIRROR_KEY = "vaultMirrorV1";
 
 const LOCAL_KEYS = {
   config: "vaultConfig",
@@ -47,6 +61,16 @@ const elements = Object.fromEntries(
     "begin-create-vault",
     "cancel-create-vault",
     "vault-view",
+    "restore-panel",
+    "restore-summary",
+    "restore-vaults",
+    "restore-notice",
+    "restore-notice-text",
+    "restore-vaults-inline",
+    "import-backup-setup",
+    "export-backup",
+    "import-backup",
+    "import-file",
     "multi-vault-notice",
     "vault-switch-form",
     "vault-switch-select",
@@ -100,6 +124,8 @@ const elements = Object.fromEntries(
 let vaultConfig = null;
 let credentials = [];
 let syncedVaults = [];
+let missingVaults = [];
+let mirrorSavedAt = null;
 let messageTimer = null;
 let syncReloadTimer = null;
 let setupFormRevealed = false;
@@ -135,18 +161,6 @@ function reportError(error) {
 
 function credentialStorageKey(id) {
   return `${STORAGE_KEYS.credentialPrefix}${id}`;
-}
-
-function isCredentialRecord(value) {
-  return (
-    value &&
-    typeof value.id === "string" &&
-    typeof value.website === "string" &&
-    typeof value.username === "string" &&
-    value.password &&
-    typeof value.password.iv === "string" &&
-    typeof value.password.ciphertext === "string"
-  );
 }
 
 function assertSyncItemFits(key, value) {
@@ -213,12 +227,79 @@ async function readSyncedVault() {
       key.startsWith(STORAGE_KEYS.credentialPrefix) && isCredentialRecord(value)
     )
     .map(([, value]) => value);
-  return resolveVaultSnapshot(
-    configs,
-    storedLegacyConfig(stored),
-    selectedVaultId,
-    allEntries
+  return {
+    ...resolveVaultSnapshot(configs, storedLegacyConfig(stored), selectedVaultId, allEntries),
+    tombstones: stored[STORAGE_KEYS.tombstones] ?? null,
+    credentialIds: new Set(allEntries.map((entry) => entry.id))
+  };
+}
+
+async function updateTombstones(change) {
+  const stored = await chrome.storage.sync.get(STORAGE_KEYS.tombstones);
+  const next = change(stored[STORAGE_KEYS.tombstones] ?? null);
+  assertSyncItemFits(STORAGE_KEYS.tombstones, next);
+  await chrome.storage.sync.set({ [STORAGE_KEYS.tombstones]: next });
+}
+
+async function markDeleted(ids) {
+  await updateTombstones((tombstones) =>
+    addTombstones(tombstones, ids, new Date().toISOString())
   );
+}
+
+async function readMirror() {
+  const local = await chrome.storage.local.get(MIRROR_KEY);
+  return local[MIRROR_KEY] ?? null;
+}
+
+// Local only: Sync is never written while refreshing the mirror.
+async function refreshMirror(synced) {
+  const mirror = await readMirror();
+  const savedAt = synced.vaults.length > 0 ? new Date().toISOString() : mirror?.savedAt ?? null;
+  const next = mergeMirror(mirror, synced.vaults, synced.tombstones, savedAt);
+  await chrome.storage.local.set({ [MIRROR_KEY]: next });
+  mirrorSavedAt = next.savedAt;
+  missingVaults = missingFromSync(
+    next,
+    new Set(synced.vaults.map((vault) => vault.config.vaultId)),
+    synced.credentialIds,
+    synced.tombstones
+  );
+}
+
+// Additive: writes only vaults and credentials that Sync does not have, and
+// never overwrites or deletes anything.
+async function restoreToSync(vaults) {
+  const stored = await chrome.storage.sync.get(null);
+  const payload = {};
+  let vaultCount = 0;
+  let credentialCount = 0;
+  for (const { config, entries } of vaults) {
+    if (!vaultIsStored(stored, config.vaultId)) {
+      const configKey = `${STORAGE_KEYS.configPrefix}${config.vaultId}`;
+      assertSyncItemFits(configKey, config);
+      payload[configKey] = config;
+      vaultCount += 1;
+    }
+    for (const entry of entries) {
+      const key = credentialStorageKey(entry.id);
+      if (stored[key] || payload[key]) continue;
+      const tagged = { ...entry, vaultId: config.vaultId };
+      assertSyncItemFits(key, tagged);
+      payload[key] = tagged;
+      credentialCount += 1;
+    }
+  }
+  if (Object.keys(payload).length > 0) {
+    await chrome.storage.sync.set(payload);
+  }
+  await updateTombstones((tombstones) =>
+    removeTombstones(tombstones, {
+      vaults: vaults.map(({ config }) => config.vaultId),
+      credentials: vaults.flatMap(({ entries }) => entries.map((entry) => entry.id))
+    })
+  );
+  return { vaultCount, credentialCount };
 }
 
 async function replaceSyncedVault(config, entries) {
@@ -304,6 +385,11 @@ async function loadState() {
   // Keep startup and Sync event handling free of deletions. A partial snapshot
   // must never cause records to be removed from every synchronized computer.
   const synced = await readSyncedVault();
+  try {
+    await refreshMirror(synced);
+  } catch (error) {
+    reportError(error);
+  }
 
   vaultConfig = synced.config;
   credentials = synced.entries;
@@ -413,8 +499,37 @@ function renderVaultSwitcher() {
     : vaultConfig.vaultId;
 }
 
+function missingSummary() {
+  const vaultCount = missingVaults.filter((vault) => vault.configMissing).length;
+  const credentialCount = missingVaults.reduce(
+    (total, vault) => total + vault.entries.length,
+    0
+  );
+  const parts = [];
+  if (vaultCount > 0) parts.push(plural(vaultCount, "vault"));
+  if (credentialCount > 0) parts.push(plural(credentialCount, "saved credential"));
+  return parts.join(" and ");
+}
+
+function renderRestore(configured) {
+  const hasMissing = missingVaults.length > 0;
+  elements["restore-panel"].hidden = configured || !hasMissing;
+  elements["restore-notice"].hidden = !configured || !hasMissing;
+  if (!hasMissing) return;
+
+  const saved = mirrorSavedAt ? new Date(mirrorSavedAt).toLocaleString() : null;
+  const summary = missingSummary();
+  elements["restore-summary"].textContent =
+    `This computer kept a copy of ${summary}` +
+    (saved ? ` (last updated ${saved})` : "") +
+    " that is no longer in Chrome Sync. This happens when ChromePW is removed on another computer.";
+  elements["restore-notice-text"].textContent =
+    `Missing from Chrome Sync but saved on this computer: ${summary}.`;
+}
+
 function render() {
   const configured = Boolean(vaultConfig);
+  renderRestore(configured);
   elements["setup-view"].hidden = configured;
   elements["vault-view"].hidden = !configured;
   elements["setup-actions"].hidden = configured || setupFormRevealed;
@@ -710,6 +825,7 @@ elements["delete-credential"].addEventListener("click", async () => {
   try {
     await unlockVault(secret, vaultConfig);
     await chrome.storage.sync.remove(credentialStorageKey(credential.id));
+    await markDeleted({ credentials: [credential.id] });
     credentials = credentials.filter((item) => item.id !== credential.id);
     elements["reveal-secret"].value = "";
     hideRevealedPassword();
@@ -799,6 +915,7 @@ elements["prune-vaults"].addEventListener("click", async () => {
     await unlockVault(secret, vaultConfig);
     if (!(await confirmPruneVaults(others.length, otherCount))) return;
     await selectSyncedVault(vaultConfig.vaultId);
+    await markDeleted({ vaults: others.map((vault) => vault.config.vaultId) });
     await removeOtherSyncedVaults(vaultConfig);
     elements["prune-secret"].value = "";
     await loadState();
@@ -808,20 +925,101 @@ elements["prune-vaults"].addEventListener("click", async () => {
   }
 });
 
+async function restoreMissingVaults(button) {
+  button.disabled = true;
+  try {
+    const restored = await restoreToSync(missingVaults);
+    await loadState();
+    showMessage(
+      `Restored ${plural(restored.vaultCount, "vault")} and ${plural(
+        restored.credentialCount,
+        "credential"
+      )} to Chrome Sync.`
+    );
+  } catch (error) {
+    reportError(error);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+elements["restore-vaults"].addEventListener("click", () =>
+  restoreMissingVaults(elements["restore-vaults"])
+);
+elements["restore-vaults-inline"].addEventListener("click", () =>
+  restoreMissingVaults(elements["restore-vaults-inline"])
+);
+
+elements["export-backup"].addEventListener("click", () => {
+  if (syncedVaults.length === 0) {
+    reportError(new Error("There is no vault to export yet."));
+    return;
+  }
+  const exportedAt = new Date().toISOString();
+  const backup = buildBackup(syncedVaults, exportedAt);
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" })
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `chromepw-backup-${exportedAt.slice(0, 10)}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showMessage("Backup exported. Passwords in the file stay encrypted with your master secret.");
+});
+
+for (const id of ["import-backup", "import-backup-setup"]) {
+  elements[id].addEventListener("click", () => {
+    elements["import-file"].value = "";
+    elements["import-file"].click();
+  });
+}
+
+elements["import-file"].addEventListener("change", async () => {
+  const [file] = elements["import-file"].files;
+  if (!file) return;
+  try {
+    const vaults = parseBackup(await file.text());
+    const restored = await restoreToSync(vaults);
+    await loadState();
+    showMessage(
+      restored.vaultCount + restored.credentialCount === 0
+        ? "Everything in this backup is already in Chrome Sync."
+        : `Imported ${plural(restored.vaultCount, "vault")} and ${plural(
+            restored.credentialCount,
+            "credential"
+          )}.`
+    );
+  } catch (error) {
+    reportError(error);
+  } finally {
+    elements["import-file"].value = "";
+  }
+});
+
 elements["reset-vault"].addEventListener("click", async () => {
   const vaultCount = Math.max(syncedVaults.length, 1);
   const credentialCount = syncedVaults.reduce((total, vault) => total + vault.count, 0);
   if (!(await confirmResetVault(vaultCount, credentialCount))) return;
 
   try {
+    const mirror = await readMirror();
+    await markDeleted({
+      vaults: [
+        ...syncedVaults.map((vault) => vault.config.vaultId),
+        ...Object.keys(mirror?.vaults ?? {})
+      ]
+    });
     const stored = await chrome.storage.sync.get(null);
     const vaultKeys = Object.keys(stored).filter(isVaultKey);
     if (vaultKeys.length > 0) {
       await chrome.storage.sync.remove(vaultKeys);
     }
+    await chrome.storage.local.remove(MIRROR_KEY);
     vaultConfig = null;
     credentials = [];
     syncedVaults = [];
+    missingVaults = [];
     hideRevealedPassword();
     resetEditor();
     render();
@@ -840,7 +1038,9 @@ window.addEventListener("pagehide", () => {
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  const relevantChange = Object.keys(changes).some(isVaultKey);
+  const relevantChange = Object.keys(changes).some(
+    (key) => isVaultKey(key) || key === STORAGE_KEYS.tombstones
+  );
   if (areaName !== "sync" || !relevantChange) return;
 
   clearTimeout(syncReloadTimer);
