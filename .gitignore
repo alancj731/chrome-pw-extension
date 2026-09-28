@@ -16,3 +16,4 @@ npm-debug.log*
 # Chrome extension packages and signing keys
 *.crx
 *.pem
+dist/
