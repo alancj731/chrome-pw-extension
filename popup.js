@@ -79,7 +79,17 @@ const elements = Object.fromEntries(
     "current-secret",
     "new-secret",
     "new-secret-confirm",
+    "reset-vault-warning",
+    "reset-vault-form",
+    "reset-vault-summary",
+    "reset-confirm-input",
+    "cancel-reset-vault",
+    "confirm-reset-vault",
     "prune-vaults-section",
+    "prune-vaults-warning",
+    "prune-vaults-summary",
+    "cancel-prune-vaults",
+    "confirm-prune-vaults",
     "prune-secret",
     "prune-vaults",
     "reset-vault"
@@ -312,6 +322,74 @@ function formatVaultOption({ config, count }) {
   const countText = count === 1 ? "1 credential" : `${count} credentials`;
   const current = config.vaultId === vaultConfig?.vaultId ? " (in use)" : "";
   return `Created ${date} — ${countText}${current}`;
+}
+
+function plural(count, singular, pluralForm = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+function confirmPruneVaults(vaultCount, credentialCount) {
+  const dialog = elements["prune-vaults-warning"];
+  elements["prune-vaults-summary"].textContent =
+    `${plural(vaultCount, "vault")} and ${plural(credentialCount, "saved credential")} ` +
+    "will be permanently removed from every computer using this Chrome Sync account.";
+  return new Promise((resolve) => {
+    const finish = (confirmed) => {
+      elements["confirm-prune-vaults"].removeEventListener("click", onConfirm);
+      elements["cancel-prune-vaults"].removeEventListener("click", onCancel);
+      dialog.removeEventListener("cancel", onCancel);
+      dialog.close();
+      resolve(confirmed);
+    };
+    const onConfirm = () => finish(true);
+    const onCancel = () => finish(false);
+    elements["confirm-prune-vaults"].addEventListener("click", onConfirm);
+    elements["cancel-prune-vaults"].addEventListener("click", onCancel);
+    dialog.addEventListener("cancel", onCancel);
+    dialog.showModal();
+    elements["cancel-prune-vaults"].focus();
+  });
+}
+
+const RESET_CONFIRMATION = "RESET";
+
+function confirmResetVault(vaultCount, credentialCount) {
+  const dialog = elements["reset-vault-warning"];
+  const form = elements["reset-vault-form"];
+  const input = elements["reset-confirm-input"];
+  const confirmButton = elements["confirm-reset-vault"];
+  elements["reset-vault-summary"].textContent =
+    `${plural(vaultCount, "vault")} and ${plural(credentialCount, "saved credential")} ` +
+    "will be permanently removed from every computer using this Chrome Sync account.";
+  input.value = "";
+  confirmButton.disabled = true;
+
+  return new Promise((resolve) => {
+    const matches = () => input.value.trim() === RESET_CONFIRMATION;
+    const onInput = () => {
+      confirmButton.disabled = !matches();
+    };
+    const finish = (confirmed) => {
+      input.removeEventListener("input", onInput);
+      form.removeEventListener("submit", onSubmit);
+      elements["cancel-reset-vault"].removeEventListener("click", onCancel);
+      dialog.removeEventListener("cancel", onCancel);
+      input.value = "";
+      dialog.close();
+      resolve(confirmed);
+    };
+    const onSubmit = (event) => {
+      event.preventDefault();
+      if (matches()) finish(true);
+    };
+    const onCancel = () => finish(false);
+    input.addEventListener("input", onInput);
+    form.addEventListener("submit", onSubmit);
+    elements["cancel-reset-vault"].addEventListener("click", onCancel);
+    dialog.addEventListener("cancel", onCancel);
+    dialog.showModal();
+    input.focus();
+  });
 }
 
 function renderVaultSwitcher() {
@@ -700,29 +778,24 @@ elements["prune-vaults"].addEventListener("click", async () => {
     (vault) => vault.config.vaultId !== vaultConfig.vaultId
   );
   const otherCount = others.reduce((total, vault) => total + vault.count, 0);
-  if (
-    !confirm(
-      `Permanently delete ${others.length} other vault(s) and their ${otherCount} credential(s) from every computer?`
-    )
-  ) {
-    return;
-  }
 
   try {
     await unlockVault(secret, vaultConfig);
+    if (!(await confirmPruneVaults(others.length, otherCount))) return;
     await selectSyncedVault(vaultConfig.vaultId);
     await removeOtherSyncedVaults(vaultConfig);
     elements["prune-secret"].value = "";
     await loadState();
-    showMessage("Other vaults deleted.");
+    showMessage(`${plural(others.length, "vault")} deleted.`);
   } catch (error) {
     reportError(error);
   }
 });
 
 elements["reset-vault"].addEventListener("click", async () => {
-  const confirmation = prompt('Type "RESET" to permanently delete the vault.');
-  if (confirmation !== "RESET") return;
+  const vaultCount = Math.max(syncedVaults.length, 1);
+  const credentialCount = syncedVaults.reduce((total, vault) => total + vault.count, 0);
+  if (!(await confirmResetVault(vaultCount, credentialCount))) return;
 
   try {
     const stored = await chrome.storage.sync.get(null);
@@ -736,7 +809,7 @@ elements["reset-vault"].addEventListener("click", async () => {
     hideRevealedPassword();
     resetEditor();
     render();
-    showMessage("Vault reset. You can create a new one.");
+    showMessage("ChromePW was reset. You can now create a new vault.");
   } catch (error) {
     reportError(error);
   }

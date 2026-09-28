@@ -42,7 +42,7 @@ If you are certain that no existing vault should be used, select **Create a new 
 
 Creating a vault is additive: it never deletes or hides another vault. If an older vault arrives from Chrome Sync afterwards, ChromePW uses the older vault and lists both under **Switch vault**. Unwanted vaults can be removed explicitly with **Vault settings → Delete other vaults**.
 
-![ChromePW warning before replacing the synchronized vault](screenshots/replace-vault-warning.png)
+![ChromePW confirmation before creating a separate vault](screenshots/replace-vault-warning.png)
 
 After confirming, enter and confirm a master secret of at least 12 characters. The master secret is never saved and cannot be recovered.
 

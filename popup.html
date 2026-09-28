@@ -35,6 +35,44 @@
         </div>
       </dialog>
 
+      <dialog id="prune-vaults-warning" class="warning-dialog" aria-labelledby="prune-vaults-warning-title">
+        <div class="warning-dialog-content">
+          <div class="warning-heading">
+            <span class="warning-icon" aria-hidden="true">!</span>
+            <div>
+              <h2 id="prune-vaults-warning-title">Delete other vaults?</h2>
+              <p id="prune-vaults-summary"></p>
+            </div>
+          </div>
+          <p class="warning-note"><strong>This cannot be undone.</strong> The vault currently in use and its credentials are kept.</p>
+          <div class="warning-actions">
+            <button id="cancel-prune-vaults" class="ghost" type="button">Cancel</button>
+            <button id="confirm-prune-vaults" class="danger" type="button">Delete permanently</button>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog id="reset-vault-warning" class="warning-dialog" aria-labelledby="reset-vault-warning-title">
+        <form id="reset-vault-form" class="warning-dialog-content">
+          <div class="warning-heading">
+            <span class="warning-icon" aria-hidden="true">!</span>
+            <div>
+              <h2 id="reset-vault-warning-title">Reset ChromePW?</h2>
+              <p id="reset-vault-summary"></p>
+            </div>
+          </div>
+          <p class="warning-note"><strong>This cannot be undone.</strong> Use this only if you have lost your master secret or want to start over.</p>
+          <label class="confirm-label">
+            <span>Type <strong>RESET</strong> to confirm</span>
+            <input id="reset-confirm-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+          </label>
+          <div class="warning-actions">
+            <button id="cancel-reset-vault" class="ghost" type="button">Cancel</button>
+            <button id="confirm-reset-vault" class="danger" type="submit" disabled>Reset permanently</button>
+          </div>
+        </form>
+      </dialog>
+
       <section id="setup-view" hidden>
         <div class="intro">
           <h2>No synced vault found yet</h2>
