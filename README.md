@@ -65,11 +65,32 @@ Use **Edit selected** or **Delete selected** to manage a credential. Open **Vaul
 
 ### 4. Removing, updating and backing up
 
-**Do not remove ChromePW to update it.** Removing an extension makes Chrome delete its Chrome Sync data, and that deletion reaches every computer on the same Google account. To update, select **reload ↻** on the ChromePW card in `chrome://extensions`.
+**Removing ChromePW on one computer affects every computer.** When an extension is removed, Chrome deletes its Chrome Sync data, and that deletion reaches every computer signed into the same Google account. No extension can prevent this, because the extension does not run while it is being removed.
 
-If ChromePW is removed on one computer anyway, the other computers still have their own encrypted copy. Opening ChromePW there shows **Your vault can be restored**; select **Restore to Chrome Sync** to put the vault back for every computer. Restoring only adds what is missing and never overwrites anything. Deliberately deleted credentials and vaults (**Delete selected**, **Delete other vaults**, **Reset vault**) are not offered for restore.
+**To update ChromePW, select reload ↻ on its card in `chrome://extensions`. Do not remove it.**
 
-Open **Vault settings → Export backup** from time to time and keep the file somewhere safe. It protects you if ChromePW is removed on your only computer. Use **Import backup** (or **Import a backup file** on the setup screen) to restore it. The passwords in the file stay encrypted and still need the master secret.
+#### Restoring after a removal
+
+Every computer keeps its own encrypted copy of the vault, which removal on another computer cannot delete. If the synchronized vault disappears:
+
+1. Open ChromePW on a computer that still has it installed. It shows **Your vault can be restored**.
+2. Select **Restore to Chrome Sync**.
+3. The vault returns on every computer, including the one where ChromePW is reinstalled. The master secret stays the same.
+
+![ChromePW offering to restore a vault that is missing from Chrome Sync](screenshots/restore.png)
+
+Restoring only adds what is missing and never overwrites anything. Credentials and vaults you deleted on purpose (**Delete selected**, **Delete other vaults**, **Reset vault**) are not offered for restore.
+
+#### Limitations
+
+- The computer you restore from must run ChromePW 1.7.0 or later, and ChromePW must have been opened on it at least once. Earlier versions keep no local copy.
+- Each computer's copy contains what ChromePW showed the last time it was opened on that computer. If you add a password on computer A and remove ChromePW from A before opening ChromePW on computer B, that password cannot be restored from B.
+- If a password arrives from Chrome Sync but its vault is missing, ChromePW says so and names the password. Restore the vault from the computer where it was saved, or import a backup file.
+- If ChromePW is removed on your only computer, nothing is left to restore from except a backup file.
+
+#### Backup files
+
+Open **Vault settings → Export backup** from time to time and keep the file somewhere safe. Use **Import backup** (or **Import a backup file** on the setup screen) to restore it. The passwords in the file stay encrypted and still need the master secret.
 
 ## Security design
 
