@@ -119,7 +119,3 @@ The master secret cannot be recovered. Anyone who can access the synchronized ci
 
 The extension has no runtime dependencies.
 
-```bash
-npm test
-npm run check
-```
