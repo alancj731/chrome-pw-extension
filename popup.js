@@ -71,6 +71,7 @@ const elements = Object.fromEntries(
     "website",
     "username",
     "entry-password",
+    "toggle-entry-password",
     "password-help",
     "save-secret",
     "save-credential",
@@ -458,8 +459,17 @@ function hideRevealedPassword() {
   elements["revealed-password"].hidden = true;
 }
 
+function setEntryPasswordVisible(visible) {
+  const label = visible ? "Hide password" : "Show password";
+  elements["entry-password"].type = visible ? "text" : "password";
+  elements["toggle-entry-password"].setAttribute("aria-pressed", String(visible));
+  elements["toggle-entry-password"].setAttribute("aria-label", label);
+  elements["toggle-entry-password"].title = label;
+}
+
 function resetEditor() {
   elements["credential-form"].reset();
+  setEntryPasswordVisible(false);
   elements["credential-id"].value = "";
   elements["editor-summary"].textContent = "Add a credential";
   elements["password-help"].textContent = "Required for a new credential.";
@@ -669,6 +679,7 @@ elements["edit-credential"].addEventListener("click", () => {
   elements.website.value = credential.website;
   elements.username.value = credential.username;
   elements["entry-password"].value = "";
+  setEntryPasswordVisible(false);
   elements["save-secret"].value = "";
   elements["editor-summary"].textContent = "Edit credential";
   elements["password-help"].textContent = "Leave blank to keep the current password.";
@@ -679,6 +690,11 @@ elements["edit-credential"].addEventListener("click", () => {
 });
 
 elements["cancel-edit"].addEventListener("click", resetEditor);
+
+elements["toggle-entry-password"].addEventListener("click", () => {
+  setEntryPasswordVisible(elements["entry-password"].type === "password");
+  elements["entry-password"].focus();
+});
 
 elements["delete-credential"].addEventListener("click", async () => {
   const credential = selectedCredential();
@@ -817,6 +833,7 @@ elements["reset-vault"].addEventListener("click", async () => {
 
 window.addEventListener("pagehide", () => {
   hideRevealedPassword();
+  setEntryPasswordVisible(false);
   for (const input of document.querySelectorAll('input[type="password"]')) {
     input.value = "";
   }

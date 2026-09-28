@@ -342,6 +342,60 @@ button {
   text-transform: uppercase;
 }
 
+.secret-field {
+  position: relative;
+  display: block;
+}
+
+.secret-field input {
+  padding-right: 42px;
+}
+
+.reveal-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 7px;
+  color: #5d7066;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.reveal-toggle:hover {
+  color: #1e5c43;
+  background: #edf2ef;
+}
+
+.reveal-toggle:focus-visible {
+  outline: 2px solid #23835d;
+  outline-offset: 1px;
+}
+
+.reveal-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.reveal-toggle .eye-closed,
+.reveal-toggle[aria-pressed="true"] .eye-open {
+  display: none;
+}
+
+.reveal-toggle[aria-pressed="true"] .eye-closed {
+  display: block;
+}
+
 .password-row,
 .button-row {
   display: flex;
