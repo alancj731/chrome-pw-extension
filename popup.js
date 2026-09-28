@@ -61,6 +61,8 @@ const elements = Object.fromEntries(
     "begin-create-vault",
     "cancel-create-vault",
     "vault-view",
+    "orphan-notice",
+    "orphan-notice-text",
     "restore-panel",
     "restore-summary",
     "restore-vaults",
@@ -125,6 +127,7 @@ let vaultConfig = null;
 let credentials = [];
 let syncedVaults = [];
 let missingVaults = [];
+let orphanedEntries = [];
 let mirrorSavedAt = null;
 let messageTimer = null;
 let syncReloadTimer = null;
@@ -394,6 +397,7 @@ async function loadState() {
   vaultConfig = synced.config;
   credentials = synced.entries;
   syncedVaults = synced.vaults;
+  orphanedEntries = synced.orphanedEntries;
   credentials.sort((left, right) =>
     `${left.website}\u0000${left.username}`.localeCompare(`${right.website}\u0000${right.username}`)
   );
@@ -511,7 +515,24 @@ function missingSummary() {
   return parts.join(" and ");
 }
 
+function renderOrphans() {
+  const restorable = new Set(
+    missingVaults.filter((vault) => vault.configMissing).map((vault) => vault.config.vaultId)
+  );
+  const stranded = orphanedEntries.filter((entry) => !restorable.has(entry.vaultId));
+  elements["orphan-notice"].hidden = stranded.length === 0;
+  if (stranded.length === 0) return;
+
+  const names = stranded.map((entry) => `${entry.website} — ${entry.username}`).join(", ");
+  elements["orphan-notice-text"].textContent =
+    `${plural(stranded.length, "saved credential")} (${names}) arrived from Chrome Sync, ` +
+    `but the vault ${stranded.length === 1 ? "it belongs" : "they belong"} to is missing. ` +
+    "On the computer where it was saved, open " +
+    "ChromePW and select Restore to Chrome Sync, or import a backup file here.";
+}
+
 function renderRestore(configured) {
+  renderOrphans();
   const hasMissing = missingVaults.length > 0;
   elements["restore-panel"].hidden = configured || !hasMissing;
   elements["restore-notice"].hidden = !configured || !hasMissing;

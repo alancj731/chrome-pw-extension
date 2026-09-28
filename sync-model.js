@@ -84,10 +84,19 @@ export function resolveVaultSnapshot(
     return { config: candidate, entries: vaultEntries, count: vaultEntries.length };
   });
 
+  // Credentials whose vault settings are not in Sync (for example because the
+  // vault was deleted while another computer still had it open). They cannot
+  // be decrypted until the vault settings are restored.
+  const knownVaultIds = new Set(candidates.map((candidate) => candidate.vaultId));
+  const orphanedEntries = allEntries.filter(
+    (entry) => !knownVaultIds.has(entryVaultId(entry, legacyConfig))
+  );
+
   return {
     config,
     entries,
     vaults,
+    orphanedEntries,
     vaultCount: candidates.length
   };
 }
