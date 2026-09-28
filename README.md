@@ -2,6 +2,8 @@
 
 ChromePW is a small Chrome extension for manually storing encrypted passwords and synchronizing them through Chrome Sync. It does not inspect websites, autofill forms, make its own network requests, or request access to browsing activity.
 
+Read the [privacy policy](docs/index.html) for details about Chrome Sync, local storage, and backups.
+
 ## Features
 
 - Set up one master secret (minimum 12 characters).
@@ -118,4 +120,3 @@ The master secret cannot be recovered. Anyone who can access the synchronized ci
 ## Development
 
 The extension has no runtime dependencies.
-
