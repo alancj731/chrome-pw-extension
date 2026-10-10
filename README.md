@@ -22,13 +22,22 @@ Read the [privacy policy](https://chrome-password-manager.netlify.app/) for deta
 
 ## Install in Chrome
 
+Install ChromePW from the [Chrome Web Store](https://chromewebstore.google.com/detail/chromepw/mllebaeopcceakgijpcbjkeomcjgfhbl):
+
+1. Open the ChromePW listing in the Chrome Web Store.
+2. Select **Add to Chrome**, then **Add extension**.
+3. Pin ChromePW from the extensions menu if desired.
+
+Click the ChromePW toolbar icon to create or use the vault.
+
+Install ChromePW from the Chrome Web Store on every computer that should share the vault. Chrome Sync only shares data between installations with the same extension ID, so a Store installation does not see the vault of an unpacked (Developer mode) installation.
+
+### Load unpacked (development)
+
 1. Open `chrome://extensions`.
 2. Enable **Developer mode**.
 3. Select **Load unpacked**.
 4. Choose this project directory.
-5. Pin ChromePW from the extensions menu if desired.
-
-Click the ChromePW toolbar icon to create or use the vault.
 
 ## How to use ChromePW
 
@@ -69,7 +78,7 @@ Use **Edit selected** or **Delete selected** to manage a credential. Open **Vaul
 
 **Removing ChromePW on one computer affects every computer.** When an extension is removed, Chrome deletes its Chrome Sync data, and that deletion reaches every computer signed into the same Google account. No extension can prevent this, because the extension does not run while it is being removed.
 
-**To update ChromePW, select reload ↻ on its card in `chrome://extensions`. Do not remove it.**
+**Chrome updates the Web Store version automatically. Never remove and reinstall ChromePW to update it.** For an unpacked installation, select reload ↻ on its card in `chrome://extensions` instead.
 
 #### Restoring after a removal
 
@@ -113,10 +122,12 @@ Open **Vault settings → Export backup** from time to time and keep the file so
 - The extension requests only Chrome's `storage` permission and has no content scripts, host permissions, background worker, analytics, or network code.
 - Closing the popup discards entered secrets and decrypted values from the extension page.
 
-Chrome handles transport and account synchronization; the extension itself never receives Google credentials. Chrome Sync must be enabled for the same Google account on each computer, and the extension must have the same ID on each installation.
+Chrome handles transport and account synchronization; the extension itself never receives Google credentials. Chrome Sync must be enabled for the same Google account on each computer, and the extension must have the same ID on each installation (install it from the Chrome Web Store everywhere).
 
 The master secret cannot be recovered. Anyone who can access the synchronized ciphertext can attempt offline guesses, so use a long and unique secret. ChromePW cannot protect data on a compromised computer or from malicious browser extensions with sufficient access.
 
 ## Development
 
 The extension has no runtime dependencies.
+
+Run `npm run package:webstore` to create a versioned ZIP in `dist/` for the Chrome Web Store. The package omits the development-only `key` field from its manifest; the source manifest keeps that key so existing unpacked installations retain their ID and vault data. The Store-assigned ID may differ, so export a backup from an unpacked installation before replacing it and import that backup into the Store installation.

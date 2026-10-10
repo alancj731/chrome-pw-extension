@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560">
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#176b4a"/>
+      <stop offset="1" stop-color="#0d4f36"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="20" stdDeviation="20" flood-color="#063824" flood-opacity=".32"/>
+    </filter>
+  </defs>
+  <rect width="1400" height="560" fill="url(#background)"/>
+  <circle cx="1135" cy="215" r="365" fill="#2d855f" opacity=".47"/>
+  <circle cx="1380" cy="552" r="268" fill="#0a4530" opacity=".54"/>
+  <circle cx="5" cy="592" r="238" fill="#2e8660" opacity=".35"/>
+
+  <rect x="108" y="166" width="108" height="108" rx="29" fill="#fff"/>
+  <path d="M141 218v-13a21 21 0 0 1 42 0v13" fill="none" stroke="#176b4a" stroke-width="11" stroke-linecap="round"/>
+  <rect x="130" y="214" width="64" height="46" rx="11" fill="#176b4a"/>
+  <circle cx="162" cy="232" r="6" fill="#fff"/>
+  <path d="M162 236v9" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+
+  <text x="252" y="226" font-family="DejaVu Sans, sans-serif" font-size="76" font-weight="bold" fill="#fff">ChromePW</text>
+  <text x="256" y="275" font-family="DejaVu Sans, sans-serif" font-size="29" fill="#e4f2e8">Encrypted password vault</text>
+
+  <rect x="882" y="38" width="353" height="484" rx="26" fill="#fff" filter="url(#shadow)"/>
+  <rect x="895" y="51" width="327" height="458" rx="14" fill="#f4f7f5"/>
+</svg>

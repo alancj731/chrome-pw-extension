@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "check": "node --check vault.js && node --check sync-model.js && node --check popup.js"
+    "check": "node --check vault.js && node --check sync-model.js && node --check popup.js",
+    "package:webstore": "python3 scripts/package_webstore.py"
   }
 }
